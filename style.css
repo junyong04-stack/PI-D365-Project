@@ -53,9 +53,9 @@ body {
 }
 
 .wrap {
-  max-width: 1120px;
+  max-width: 1640px;
   margin: 0 auto;
-  padding: 32px 20px 80px;
+  padding: 24px 24px 80px;
 }
 
 header.top {
@@ -65,6 +65,26 @@ header.top {
   gap: 16px;
   margin-bottom: 24px;
   flex-wrap: wrap;
+}
+
+header.top .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+header.top .brand img {
+  height: 28px;
+  width: auto;
+  flex: none;
+}
+
+header.top .brand-word {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  flex: none;
 }
 
 header.top h1 {
@@ -366,6 +386,7 @@ header.top p {
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 13px;
 }
 
@@ -395,16 +416,21 @@ tbody tr:hover {
 
 .cat-badge {
   display: inline-block;
+  max-width: 100%;
   font-size: 11px;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: var(--gridline);
   color: var(--text-secondary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  vertical-align: bottom;
 }
 
-.title-cell { font-weight: 500; min-width: 140px; }
-.desc-cell { color: var(--text-secondary); min-width: 200px; max-width: 280px; }
+.title-cell { font-weight: 500; overflow-wrap: break-word; }
+.desc-cell { color: var(--text-secondary); overflow-wrap: break-word; }
 
 .importance-badge {
   font-size: 11px;
@@ -424,9 +450,11 @@ select.status-select {
   background: var(--surface-1);
   color: var(--text-primary);
   font-weight: 600;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.progress-cell { min-width: 90px; }
+.progress-cell {}
 .progress-cell .progress-value {
   font-size: 13px;
   font-weight: 600;
@@ -445,7 +473,7 @@ select.status-select {
   border-radius: var(--radius-pill);
 }
 
-.stage-cell { min-width: 150px; }
+.stage-cell {}
 .stage-grid {
   display: grid;
   grid-template-columns: repeat(3, auto);
@@ -475,7 +503,8 @@ select.status-select {
   background: var(--surface-1);
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
-  width: 128px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .deadline-badge {
@@ -492,7 +521,7 @@ select.status-select {
 
 .issue-cell textarea, .remark-cell textarea {
   width: 100%;
-  min-width: 160px;
+  box-sizing: border-box;
   min-height: 40px;
   font: inherit;
   font-size: 12px;
