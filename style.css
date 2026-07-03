@@ -163,11 +163,89 @@ header.top p {
 }
 
 /* section grid */
+.wrap > section.card {
+  margin-bottom: 16px;
+}
+
 .section-row {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
   gap: 16px;
   margin: 16px 0;
+}
+
+/* gantt / timeline */
+.empty-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 8px 0;
+}
+
+.gantt-axis {
+  position: relative;
+  height: 22px;
+  margin-left: 160px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--baseline);
+}
+
+.gantt-month {
+  position: absolute;
+  top: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  transform: translateX(-2px);
+  white-space: nowrap;
+}
+
+.gantt-today-label {
+  position: absolute;
+  top: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--status-serious);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.gantt-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+}
+
+.gantt-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-track {
+  position: relative;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--gridline);
+}
+
+.gantt-bar {
+  position: absolute;
+  top: 2px;
+  height: 14px;
+  min-width: 6px;
+  border-radius: 4px;
+}
+
+.gantt-today-line {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 1px;
+  background: var(--status-serious);
+  opacity: 0.6;
 }
 
 .card h2 {
@@ -348,28 +426,14 @@ select.status-select {
   font-weight: 600;
 }
 
-.progress-cell { min-width: 140px; }
-.progress-cell .row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.progress-cell input[type="range"] {
-  flex: 1;
-  accent-color: var(--series-blue);
-}
-.progress-cell input[type="number"] {
-  width: 50px;
+.progress-cell { min-width: 90px; }
+.progress-cell .progress-value {
+  font-size: 13px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  padding: 4px 6px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface-1);
-  color: var(--text-primary);
-  font-size: 12px;
+  margin-bottom: 6px;
 }
 .progress-cell .mini-track {
-  margin-top: 6px;
   height: 6px;
   border-radius: var(--radius-pill);
   background: var(--series-blue-track);
@@ -380,6 +444,51 @@ select.status-select {
   background: var(--series-blue);
   border-radius: var(--radius-pill);
 }
+
+.stage-cell { min-width: 150px; }
+.stage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 4px 8px;
+}
+.stage-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.stage-chip input[type="checkbox"] {
+  accent-color: var(--series-blue);
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+}
+
+.date-input {
+  font-size: 12px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  width: 128px;
+}
+
+.deadline-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.deadline-badge.tone-good { background: rgba(12, 163, 12, 0.12); color: var(--status-good); }
+.deadline-badge.tone-serious { background: rgba(211, 59, 59, 0.12); color: var(--status-serious); }
+.deadline-badge.tone-neutral { background: var(--status-neutral-bg); color: var(--text-muted); }
 
 .issue-cell textarea, .remark-cell textarea {
   width: 100%;

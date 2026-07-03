@@ -21,6 +21,46 @@ const STATUS_COLOR = {
   보류: "var(--status-serious)",
 };
 
+const STAGE_KEYS = ["requirement", "dataPrep", "systemDev", "thirdPartyIf", "test", "deploy"];
+const STAGE_LABELS = {
+  requirement: "요구사항정의",
+  dataPrep: "데이터정비",
+  systemDev: "시스템개발",
+  thirdPartyIf: "3rd party I/F",
+  test: "테스트",
+  deploy: "배포",
+};
+const STAGE_SHORT = {
+  requirement: "요구",
+  dataPrep: "데이터",
+  systemDev: "개발",
+  thirdPartyIf: "I/F",
+  test: "테스트",
+  deploy: "배포",
+};
+
+// 체크박스(stages) 기반 진행률이 원칙. 아직 체크박스를 한 번도 안 건드린
+// 구버전 문서(stages 필드 없음)는 예전 진행률(%) 값을 그대로 보여준다.
+function effectiveProgress(t) {
+  if (t.stages && typeof t.stages === "object") {
+    const checked = STAGE_KEYS.filter((k) => t.stages[k]).length;
+    return Math.round((checked / STAGE_KEYS.length) * 100);
+  }
+  return clamp(t.progress);
+}
+
+// 마감준수여부: 종료일 대비 오늘 날짜로 자동 판단(수기 입력 없음)
+function deadlineStatus(t) {
+  if (!t.endDate) return { label: "기한 미정", tone: "neutral" };
+  if (t.status === "완료") return { label: "완료", tone: "good" };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(t.endDate);
+  if (Number.isNaN(end.getTime())) return { label: "기한 미정", tone: "neutral" };
+  if (today > end) return { label: "지연", tone: "serious" };
+  return { label: "정상", tone: "good" };
+}
+
 let allTasks = [];
 let filters = { category: "", department: "", status: "" };
 let pendingTableRender = false;
@@ -55,7 +95,7 @@ function weightedAvg(tasks) {
   const totalWeight = tasks.reduce((s, t) => s + (Number(t.weight) || 0), 0);
   if (!totalWeight) return 0;
   const sum = tasks.reduce(
-    (s, t) => s + (Number(t.weight) || 0) * (Number(t.progress) || 0),
+    (s, t) => s + (Number(t.weight) || 0) * effectiveProgress(t),
     0
   );
   return sum / totalWeight;
@@ -77,6 +117,7 @@ onSnapshot(
     renderKPI();
     renderCategoryChart();
     renderStatusChart();
+    renderGantt();
     renderTable();
   },
   (err) => {
@@ -202,6 +243,67 @@ function renderStatusChart() {
   }).join("");
 }
 
+// ---------- gantt / timeline ----------
+
+function renderGantt() {
+  const container = el("#gantt-chart");
+  const withDates = allTasks.filter((t) => t.startDate && t.endDate);
+  if (withDates.length === 0) {
+    container.innerHTML = `<p class="empty-note">시작일/종료일이 입력된 과제가 아직 없습니다. Excel에 일정이 채워지면 여기에 타임라인이 표시됩니다.</p>`;
+    return;
+  }
+
+  const todayTime = new Date().setHours(0, 0, 0, 0);
+  let rangeStart = Math.min(...withDates.map((t) => new Date(t.startDate).getTime()), todayTime);
+  let rangeEnd = Math.max(...withDates.map((t) => new Date(t.endDate).getTime()), todayTime);
+  const pad = Math.max((rangeEnd - rangeStart) * 0.03, 1000 * 60 * 60 * 24);
+  rangeStart -= pad;
+  rangeEnd += pad;
+  const span = rangeEnd - rangeStart || 1;
+  const pct = (t) => ((t - rangeStart) / span) * 100;
+
+  const months = [];
+  const cursor = new Date(rangeStart);
+  cursor.setDate(1);
+  while (cursor.getTime() <= rangeEnd) {
+    months.push(new Date(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  const axisHtml = `
+    <div class="gantt-axis">
+      ${months
+        .map((m) => `<div class="gantt-month" style="left:${pct(m.getTime())}%">${m.getFullYear()}.${m.getMonth() + 1}</div>`)
+        .join("")}
+      <div class="gantt-today-label" style="left:${pct(todayTime)}%">오늘</div>
+    </div>`;
+
+  const sorted = [...withDates].sort(
+    (a, b) => (a.priority ?? a.no ?? 0) - (b.priority ?? b.no ?? 0)
+  );
+
+  const rowsHtml = sorted
+    .map((t) => {
+      const s = pct(new Date(t.startDate).getTime());
+      const e = pct(new Date(t.endDate).getTime());
+      const width = Math.max(e - s, 0.6);
+      const color = STATUS_COLOR[t.status] || "var(--series-blue)";
+      return `
+        <div class="gantt-row">
+          <div class="gantt-label" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>
+          <div class="gantt-track">
+            <div class="gantt-today-line" style="left:${pct(todayTime)}%"></div>
+            <div class="gantt-bar" style="left:${s}%; width:${width}%; background:${color}" title="${escapeHtml(
+        t.title
+      )} · ${t.startDate} ~ ${t.endDate}"></div>
+          </div>
+        </div>`;
+    })
+    .join("");
+
+  container.innerHTML = axisHtml + rowsHtml;
+}
+
 // ---------- table ----------
 
 function filteredTasks() {
@@ -224,7 +326,9 @@ function isEditingActive() {
 }
 
 function rowHtml(t) {
-  const progress = clamp(t.progress);
+  const progress = effectiveProgress(t);
+  const stages = t.stages && typeof t.stages === "object" ? t.stages : {};
+  const dl = deadlineStatus(t);
   return `
     <tr data-id="${escapeHtml(t.id)}">
       <td class="no-cell">${t.no}</td>
@@ -242,13 +346,24 @@ function rowHtml(t) {
           ).join("")}
         </select>
       </td>
-      <td class="progress-cell">
-        <div class="row">
-          <input type="range" min="0" max="100" step="1" value="${progress}" data-field="progress-range" />
-          <input type="number" min="0" max="100" step="1" value="${progress}" data-field="progress-number" />
+      <td class="stage-cell">
+        <div class="stage-grid">
+          ${STAGE_KEYS.map(
+            (k) => `
+            <label class="stage-chip" title="${STAGE_LABELS[k]}">
+              <input type="checkbox" data-field="stage" data-stage="${k}" ${stages[k] ? "checked" : ""} />
+              <span>${STAGE_SHORT[k]}</span>
+            </label>`
+          ).join("")}
         </div>
-        <div class="mini-track"><div class="mini-fill" style="width:${progress}%"></div></div>
       </td>
+      <td class="progress-cell">
+        <div class="progress-value" data-role="progress-value">${progress}%</div>
+        <div class="mini-track"><div class="mini-fill" data-role="mini-fill" style="width:${progress}%"></div></div>
+      </td>
+      <td><input type="date" class="date-input" data-field="startDate" value="${t.startDate || ""}" /></td>
+      <td><input type="date" class="date-input" data-field="endDate" value="${t.endDate || ""}" /></td>
+      <td><span class="deadline-badge tone-${dl.tone}" data-role="deadline-badge">${dl.label}</span></td>
       <td class="issue-cell"><textarea data-field="issue" placeholder="이슈 없음">${escapeHtml(
         t.issue
       )}</textarea></td>
@@ -282,34 +397,57 @@ function attachRowHandlers(t) {
   if (!tr) return;
 
   const statusSel = tr.querySelector('[data-field="status"]');
-  statusSel.addEventListener("change", () =>
-    saveField(t.id, "status", statusSel.value, tr)
-  );
+  statusSel.addEventListener("change", () => {
+    saveField(t.id, "status", statusSel.value, tr);
+    refreshDeadlineBadge(tr, { ...t, status: statusSel.value });
+  });
 
-  const range = tr.querySelector('[data-field="progress-range"]');
-  const number = tr.querySelector('[data-field="progress-number"]');
-  const miniFill = tr.querySelector(".mini-fill");
+  const stageBoxes = tr.querySelectorAll('[data-field="stage"]');
+  stageBoxes.forEach((box) => {
+    box.addEventListener("change", async () => {
+      const stageKey = box.dataset.stage;
+      const nextStages = { ...(t.stages || {}), [stageKey]: box.checked };
+      t.stages = nextStages;
+      const newProgress = Math.round(
+        (STAGE_KEYS.filter((k) => nextStages[k]).length / STAGE_KEYS.length) * 100
+      );
+      tr.querySelector('[data-role="progress-value"]').textContent = `${newProgress}%`;
+      tr.querySelector('[data-role="mini-fill"]').style.width = `${newProgress}%`;
+      try {
+        await updateDoc(doc(db, "tasks", t.id), {
+          [`stages.${stageKey}`]: box.checked,
+          progress: newProgress,
+          updatedAt: serverTimestamp(),
+        });
+        tr.classList.add("save-flash");
+        setTimeout(() => tr.classList.remove("save-flash"), 600);
+      } catch (err) {
+        console.error(err);
+        alert("저장에 실패했습니다. 네트워크 연결을 확인해주세요.");
+      }
+    });
+  });
 
-  const syncVisual = (val) => {
-    range.value = val;
-    number.value = val;
-    miniFill.style.width = `${val}%`;
-  };
-
-  range.addEventListener("input", () => syncVisual(clamp(range.value)));
-  range.addEventListener("change", () =>
-    saveField(t.id, "progress", clamp(range.value), tr)
-  );
-
-  number.addEventListener("input", () => syncVisual(clamp(number.value)));
-  number.addEventListener("change", () =>
-    saveField(t.id, "progress", clamp(number.value), tr)
-  );
+  ["startDate", "endDate"].forEach((field) => {
+    const input = tr.querySelector(`[data-field="${field}"]`);
+    input.addEventListener("change", () => {
+      t[field] = input.value || null;
+      saveField(t.id, field, input.value || null, tr);
+      refreshDeadlineBadge(tr, t);
+    });
+  });
 
   ["issue", "remark"].forEach((field) => {
     const ta = tr.querySelector(`[data-field="${field}"]`);
     ta.addEventListener("blur", () => saveField(t.id, field, ta.value, tr));
   });
+}
+
+function refreshDeadlineBadge(tr, t) {
+  const dl = deadlineStatus(t);
+  const badge = tr.querySelector('[data-role="deadline-badge"]');
+  badge.textContent = dl.label;
+  badge.className = `deadline-badge tone-${dl.tone}`;
 }
 
 async function saveField(id, field, value, tr) {
